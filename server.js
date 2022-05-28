@@ -18,7 +18,10 @@ const previousSeason = currentSeason - 1;
 const seasonStartDate = "2021-05-31";
 
 app.use(bodyParser.json());
-app.use(cors());
+app.use(cors({
+    origin: 'https://www.sunnydotgg.live'
+}
+));
 
 app.get("/players", async (req, res) => {
   let conn;
