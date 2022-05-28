@@ -2,7 +2,6 @@
 var mariadb = require('mariadb');
 require('dotenv').config();
 
-console.log('process', process.env)
 // create a new connection pool
 const pool = mariadb.createPool({
   host: "127.0.0.1", 
