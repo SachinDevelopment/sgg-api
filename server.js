@@ -19,7 +19,7 @@ const seasonStartDate = "2021-05-31";
 
 app.use(bodyParser.json());
 app.use(cors({
-    origin: 'https://www.sunnydotgg.live'
+    origin: 'https://sunnydotgg.live/'
 }
 ));
 
