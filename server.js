@@ -391,6 +391,9 @@ app.get("/games", async (req, res) => {
   }
 });
 
+app.get("/health", (_,res) => {
+    res.send({status: "up"})
+} )
 app.listen(port, () => {
   console.log(`Randomizer-api listening at http://localhost:${port}`);
 });
