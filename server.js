@@ -11,11 +11,12 @@ const diff = 1200;
 const inflationRate = 1.25;
 
 // Season info
-const currentSeason = 3;
+const currentSeason = 2;
 const previousSeason = currentSeason - 1;
 //const season1StartDate = "2021-03-06"
 //const season2StartDate = "2021-03-25";
-const seasonStartDate = "2021-05-31";
+// const season3StartDate = "2021-05-31";
+const seasonStartDate = "2021-03-25";
 
 app.use(bodyParser.json());
 app.use(cors({
