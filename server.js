@@ -1,10 +1,16 @@
-const express = require("express");
+const app = require("express")();
+const http = require("http").Server(app);
+const io = require("socket.io")(http, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
+});
 const bodyParser = require("body-parser");
+
 const port = 5000;
-const app = express();
 const cors = require("cors");
 const pool = require("./db");
-
 // ratings constants
 const k = 40;
 const diff = 1200;
@@ -19,61 +25,71 @@ const previousSeason = 2;
 const seasonStartDate = "2021-03-25";
 
 app.use(bodyParser.json());
-app.use(cors({
-    origin: '*',
-}
-));
+app.use(
+  cors({
+    origin: "*",
+  })
+);
 
+const getPlayerData = async (conn) => {
+  // create a new query
+  var query = `select p.*,prev.rating as prev_rating from players p left join players_season_${previousSeason} prev on p.id=prev.id`;
+  const getFavChamps = (id, name, allChamps) => {
+    const promises = allChamps.map(async (champ) => {
+      let query = `select count(*) as count from games where ((red rlike "${id}-[^,]+-${champ}-${name}-${id}" and winning_side="red") or (blue rlike "${id}-[^,]+-${champ}-${name}-${id}" and winning_side="blue")) and map="Summoner's Rift" and date > "${seasonStartDate}";`;
+      const wins = await conn.query(query);
+      query = `select count(*) as count from games where ((red rlike "${id}-[^,]+-${champ}-${name}-${id}" and winning_side="blue") or (blue rlike "${id}-[^,]+-${champ}-${name}-${id}" and winning_side="red")) and map="Summoner's Rift" and date > "${seasonStartDate}";`;
+      const loses = await conn.query(query);
+      return {
+        name: champ,
+        count: wins[0].count + loses[0].count,
+        wins: wins[0].count,
+        loses: loses[0].count,
+      };
+    });
+
+    return Promise.all(promises);
+  };
+  // execute the query and set the result to a new variable
+  var rows = await conn.query(query);
+  const getPlayerAndFavChamps = () => {
+    rows = rows.map(async (player) => {
+      let srChampsQuery = `select blue,red from games where (red rlike "${player.id}-[^,]+-[^,]+-${player.name}-${player.id}" or blue rlike "${player.id}-[^,]+-[^,]+-${player.name}-${player.id}") and map="Summoner's Rift" and date > "${seasonStartDate}";`;
+      var srChamps = await conn.query(srChampsQuery);
+      srChamps = srChamps.slice(0, srChamps.length);
+      srChamps = srChamps.map(
+        (c) =>
+          c.red.match(`${player.id}.*-(.*)-${player.name}-${player.id}`) ||
+          c.blue.match(`${player.id}.*-(.*)-${player.name}-${player.id}`)
+      );
+      srChamps = srChamps.map((c) => c[1]);
+      srChamps = [...new Set(srChamps)];
+      const srChampWrArr = await getFavChamps(player.id, player.name, srChamps);
+
+      return {
+        ...player,
+        fav_champs: srChampWrArr
+          .sort((a, b) => b.count - a.count || b.wins - a.wins)
+          .splice(0, 5),
+      };
+    });
+    return Promise.all(rows);
+  };
+
+  return await getPlayerAndFavChamps();
+}
+
+const getRandomizerState = async (conn) => {
+  const query = "select * from randomizer_state";
+  var rows = await conn.query(query);
+  return rows;
+}
 app.get("/players", async (req, res) => {
   let conn;
   try {
     // establish a connection to MariaDB
     conn = await pool.getConnection();
-    // create a new query
-    var query = `select p.*,prev.rating as prev_rating from players p left join players_season_${previousSeason} prev on p.id=prev.id`;
-    const func = (id, name, allChamps) => {
-      const promises = allChamps.map(async (champ) => {
-        let query = `select count(*) as count from games where ((red rlike "${id}-[^,]+-${champ}-${name}-${id}" and winning_side="red") or (blue rlike "${id}-[^,]+-${champ}-${name}-${id}" and winning_side="blue")) and map="Summoner's Rift" and date > "${seasonStartDate}";`;
-        const wins = await conn.query(query);
-        query = `select count(*) as count from games where ((red rlike "${id}-[^,]+-${champ}-${name}-${id}" and winning_side="blue") or (blue rlike "${id}-[^,]+-${champ}-${name}-${id}" and winning_side="red")) and map="Summoner's Rift" and date > "${seasonStartDate}";`;
-        const loses = await conn.query(query);
-        return {
-          name: champ,
-          count: wins[0].count + loses[0].count,
-          wins: wins[0].count,
-          loses: loses[0].count,
-        };
-      });
-
-      return Promise.all(promises);
-    };
-    // execute the query and set the result to a new variable
-    var rows = await conn.query(query);
-    const func2 = () => {
-      rows = rows.map(async (player) => {
-        let srChampsQuery = `select blue,red from games where (red rlike "${player.id}-[^,]+-[^,]+-${player.name}-${player.id}" or blue rlike "${player.id}-[^,]+-[^,]+-${player.name}-${player.id}") and map="Summoner's Rift" and date > "${seasonStartDate}";`;
-        var srChamps = await conn.query(srChampsQuery);
-        srChamps = srChamps.slice(0, srChamps.length);
-        srChamps = srChamps.map(
-          (c) =>
-            c.red.match(`${player.id}.*-(.*)-${player.name}-${player.id}`) ||
-            c.blue.match(`${player.id}.*-(.*)-${player.name}-${player.id}`)
-        );
-        srChamps = srChamps.map((c) => c[1]);
-        srChamps = [...new Set(srChamps)];
-        const srChampWrArr = await func(player.id, player.name, srChamps);
-
-        return {
-          ...player,
-          fav_champs: srChampWrArr
-            .sort((a, b) => b.count - a.count || b.wins - a.wins)
-            .splice(0, 5),
-        };
-      });
-      return Promise.all(rows);
-    };
-
-    const playerData = await func2();
+    const playerData = await getPlayerData(conn);
     res.send(playerData);
   } catch (err) {
     throw err;
@@ -134,13 +150,11 @@ app.get("/player/:id/stats", async (req, res) => {
     let srChampsQuery = `select blue,red from games where (red rlike "${id}-[^,]+-[^,]+-${name}-${id}" or blue rlike "${id}-[^,]+-[^,]+-${name}-${id}") and map="Summoner's Rift" and date > "${seasonStartDate}";`;
     var srChamps = await conn.query(srChampsQuery);
     srChamps = srChamps.slice(0, srChamps.length);
-    console.log("test", srChamps);
     srChamps = srChamps.map(
       (c) =>
         c.red.match(`${id}.*-(.*)-${name}-${id}`) ||
         c.blue.match(`${id}.*-(.*)-${name}-${id}`)
     );
-    console.log("test", srChamps);
     srChamps = srChamps.map((c) => c[1]);
     srChamps = [...new Set(srChamps)];
 
@@ -392,9 +406,78 @@ app.get("/games", async (req, res) => {
   }
 });
 
-app.get("/health", (_,res) => {
-    res.send({status: "up"})
-} )
-app.listen(port, () => {
+app.get("/health", (_, res) => {
+  res.send({ status: "up" });
+});
+
+http.listen(port, () => {
   console.log(`Randomizer-api listening at http://localhost:${port}`);
+});
+
+const randomize = async (selected, conn) => {
+  const len = selected.length;
+
+  if (len < 4 || len % 2 !== 0 || len > 10) {
+    return;
+  }
+
+  let availablePlayers;
+  try {
+    availablePlayers = await getPlayerData(conn);
+  } catch (err) {
+    throw err;
+  } finally {
+    if (conn) conn.release();
+  }
+ 
+  const playerClone = availablePlayers.filter((p) => selected.some((s) => s.id === p.id));
+  playerClone.forEach((player) => (player.champion = "Champion"));
+  playerClone.sort((a, b) => {
+    const bGames = b.wins + b.loses;
+    const aGames = a.wins + a.loses;
+    const val =
+      !!(bGames >= 10) - !!(aGames >= 10) ||
+      !!(bGames > 0) - !!(aGames > 0) ||
+      b.rating - a.rating ||
+      b.wins - a.wins;
+    return val;
+  });
+  const rTeam = [];
+  const bTeam = [];
+
+  while (playerClone.length > 0) {
+    rTeam.push(
+      ...playerClone.splice(Math.floor(Math.random() * playerClone.length), 1)
+    );
+    bTeam.push(
+      ...playerClone.splice(Math.floor(Math.random() * playerClone.length), 1)
+    );
+  }
+
+  return {red: rTeam, blue: bTeam};
+
+};
+
+const getInitState = async (conn) => {
+  let randomizerState;
+  try {
+    [randomizerState] = await getRandomizerState(conn);
+  } catch (err) {
+    throw err;
+  } finally {
+    if (conn) conn.release();
+  }
+  const { selected, blue, red} = randomizerState;
+  return { selected, blue, red};
+}
+
+io.on("connection", async (socket) => {
+  const conn = await pool.getConnection();
+  console.log('socket', socket.id)
+  
+  socket.emit("init", await getInitState(conn));
+
+  socket.on("randomize", async (selected) => {
+    io.emit("randomized",  await randomize(selected, conn));
+  });
 });
