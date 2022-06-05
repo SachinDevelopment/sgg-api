@@ -77,13 +77,14 @@ const getPlayerData = async (conn) => {
   };
 
   return await getPlayerAndFavChamps();
-}
+};
 
 const getRandomizerState = async (conn) => {
   const query = "select * from randomizer_state";
   var rows = await conn.query(query);
   return rows;
-}
+};
+
 app.get("/players", async (req, res) => {
   let conn;
   try {
@@ -420,17 +421,15 @@ const randomize = async (selected, conn) => {
   if (len < 4 || len % 2 !== 0 || len > 10) {
     return;
   }
-
   let availablePlayers;
   try {
     availablePlayers = await getPlayerData(conn);
   } catch (err) {
     throw err;
-  } finally {
-    if (conn) conn.release();
   }
- 
-  const playerClone = availablePlayers.filter((p) => selected.some((s) => s.id === p.id));
+  const playerClone = availablePlayers.filter((p) =>
+    selected.some((s) => s.id === p.id)
+  );
   playerClone.forEach((player) => (player.champion = "Champion"));
   playerClone.sort((a, b) => {
     const bGames = b.wins + b.loses;
@@ -454,8 +453,19 @@ const randomize = async (selected, conn) => {
     );
   }
 
-  return {red: rTeam, blue: bTeam};
-
+  try {
+    const rTeamCleaned = JSON.stringify(rTeam).replace(/'/g, "\\'");
+    const bTeamCleaned = JSON.stringify(bTeam).replace(/'/g, "\\'");
+    await conn.query("update randomizer_state set red = ?, blue = ?", [
+      rTeamCleaned,
+      bTeamCleaned,
+    ]);
+  } catch (err) {
+    throw err;
+  } finally {
+    if (conn) conn.release();
+  }
+  return { red: rTeam, blue: bTeam };
 };
 
 const getInitState = async (conn) => {
@@ -467,17 +477,90 @@ const getInitState = async (conn) => {
   } finally {
     if (conn) conn.release();
   }
-  const { selected, blue, red} = randomizerState;
-  return { selected, blue, red};
-}
+  let { selected, blue, red } = randomizerState;
+  red = JSON.parse(red.replace(/\\/g, ""));
+  blue = JSON.parse(blue.replace(/\\/g, ""));
+  selected = JSON.parse(selected.replace(/\\/g, ""));
+  return { selected, blue, red };
+};
+
+const updateRed = async (inputRed, conn) => {
+  
+  let randomizerState;
+  try {
+    const rTeamCleaned = JSON.stringify(inputRed).replace(/'/g, "\\'");
+    await conn.query("update randomizer_state set red = ?", [
+      rTeamCleaned,
+    ]);
+    
+    [randomizerState] = await getRandomizerState(conn);
+    const { red } = randomizerState;
+    const redParsed = JSON.parse(red.replace(/\\/g, ""));
+    return { red: redParsed };
+  } catch (err) {
+    throw err;
+  } finally {
+    if (conn) conn.release();
+  }
+};
+
+const updateBlue = async (inputBlue, conn) => {
+  let randomizerState;
+  try {
+    const blueTeamCleaned = JSON.stringify(inputBlue).replace(/'/g, "\\'");
+    await conn.query("update randomizer_state set blue = ?", [
+      blueTeamCleaned,
+    ]);
+    
+    [randomizerState] = await getRandomizerState(conn);
+    const { blue } = randomizerState;
+    const blueParsed = JSON.parse(blue.replace(/\\/g, ""));
+    return { blue: blueParsed };
+  } catch (err) {
+    throw err;
+  } finally {
+    if (conn) conn.release();
+  }
+};
+
+const updateSelected = async (inputSelected, conn) => {
+  let randomizerState;
+  try {
+    const selectedCleaned = JSON.stringify(inputSelected).replace(/'/g, "\\'");
+    await conn.query("update randomizer_state set selected = ?", [
+      selectedCleaned,
+    ]);
+    
+    [randomizerState] = await getRandomizerState(conn);
+    const { selected } = randomizerState;
+    const selectedParsed = JSON.parse(selected.replace(/\\/g, ""));
+    return { selected: selectedParsed };
+  } catch (err) {
+    throw err;
+  } finally {
+    if (conn) conn.release();
+  }
+};
 
 io.on("connection", async (socket) => {
   const conn = await pool.getConnection();
-  console.log('socket', socket.id)
-  
+  console.log("socket", socket.id);
+
   socket.emit("init", await getInitState(conn));
 
   socket.on("randomize", async (selected) => {
-    io.emit("randomized",  await randomize(selected, conn));
+    io.emit("randomized", await randomize(selected, conn));
   });
+
+  socket.on("redUpdate", async(red) => {
+    socket.broadcast.emit("redUpdated", await updateRed(red, conn))
+  })
+
+  socket.on("blueUpdate", async(blue) => {
+    socket.broadcast.emit("blueUpdated", await updateBlue(blue, conn))
+  })
+
+  socket.on("selectedUpdate", async(selected) => {
+    socket.broadcast.emit("selectedUpdated", await updateSelected(selected, conn))
+  })
 });
