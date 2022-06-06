@@ -467,14 +467,14 @@ app.post("/lol/games", async (req, res) => {
   }
 });
 
-app.post("/user", async(req, res) => {
-  const { login_id, email, name  } = req.body;
+app.post("/user", async (req, res) => {
+  const { login_id, email, name } = req.body;
   let conn;
   try {
     // establish a connection to MariaDB
     conn = await pool.getConnection();
     var query = `insert into users (login_id, email, name) values ('${login_id}','${email}', '${name}')`;
-    console.log('query', query)
+    console.log("query", query);
     await conn.query(query);
     res.sendStatus(200);
   } catch (err) {
@@ -482,7 +482,7 @@ app.post("/user", async(req, res) => {
   } finally {
     if (conn) return conn.release();
   }
-})
+});
 
 app.get("/health", (_, res) => {
   res.send({ status: "up" });
@@ -614,6 +614,20 @@ const updateSelected = async (inputSelected, conn) => {
   }
 };
 
+const getPlayerIdFromUserId = async (userId, conn) => {
+  try {
+    const [playerId] = await conn.query(
+      `select players.id from users left join players on users.id = players.user_id where users.login_id = '${userId}'`
+    );
+    const { id } = playerId;
+    return id;
+  } catch (err) {
+    throw err;
+  } finally {
+    if (conn) conn.release();
+  }
+};
+
 io.on("connection", async (socket) => {
   const conn = await pool.getConnection();
   console.log("socket", socket.id);
@@ -636,6 +650,14 @@ io.on("connection", async (socket) => {
     socket.broadcast.emit(
       "selectedUpdated",
       await updateSelected(selected, conn)
+    );
+  });
+
+  socket.on("online", async (userId ) => {
+    console.log("recieved online broadcast", userId);
+    io.emit(
+      "playerOnline",
+      await getPlayerIdFromUserId(userId, conn)
     );
   });
 });
