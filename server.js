@@ -467,6 +467,23 @@ app.post("/lol/games", async (req, res) => {
   }
 });
 
+app.post("/user", async(req, res) => {
+  const { login_id, email, name  } = req.body;
+  let conn;
+  try {
+    // establish a connection to MariaDB
+    conn = await pool.getConnection();
+    var query = `insert into users (login_id, email, name) values ('${login_id}','${email}', '${name}')`;
+    console.log('query', query)
+    await conn.query(query);
+    res.sendStatus(200);
+  } catch (err) {
+    throw err;
+  } finally {
+    if (conn) return conn.release();
+  }
+})
+
 app.get("/health", (_, res) => {
   res.send({ status: "up" });
 });
