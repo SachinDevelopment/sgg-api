@@ -628,11 +628,25 @@ const getPlayerIdFromUserId = async (userId, conn) => {
   }
 };
 
+
+
+const onlinePlayers = new Map();
+
 io.on("connection", async (socket) => {
   const conn = await pool.getConnection();
-  console.log("socket", socket.id);
+
+  socket.on("disconnect", async () => {
+    const playerId = await onlinePlayers.get(socket.id);
+    console.log('disconnecting', playerId)
+    onlinePlayers.delete(socket.id);
+    io.emit(
+      "playerOnline",
+      Array.from(onlinePlayers.values())
+    );
+  });
 
   socket.emit("init", await getInitState(conn));
+  socket.emit("playerOnline",  Array.from(onlinePlayers.values()));
 
   socket.on("randomize", async (selected) => {
     io.emit("randomized", await randomize(selected, conn));
@@ -653,11 +667,13 @@ io.on("connection", async (socket) => {
     );
   });
 
-  socket.on("online", async (userId ) => {
+  socket.on("online", async (userId) => {
     console.log("recieved online broadcast", userId);
+    const playerId = await getPlayerIdFromUserId(userId, conn)
+    await onlinePlayers.set(socket.id, playerId);
     io.emit(
       "playerOnline",
-      await getPlayerIdFromUserId(userId, conn)
+      Array.from(onlinePlayers.values())
     );
   });
 });
