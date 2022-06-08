@@ -473,10 +473,9 @@ app.post("/user", async (req, res) => {
   try {
     // establish a connection to MariaDB
     conn = await pool.getConnection();
-    var query = `insert into users (login_id, email, name) values ('${login_id}','${email}', '${name}')`;
-    console.log("query", query);
+    var query = `insert IGNORE into users (login_id, email, name) values ('${login_id}','${email}', '${name}')`;
     await conn.query(query);
-    res.sendStatus(200);
+    return res.sendStatus(200);
   } catch (err) {
     throw err;
   } finally {
