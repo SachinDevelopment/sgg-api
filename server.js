@@ -408,8 +408,7 @@ app.get("/games", async (req, res) => {
 });
 
 app.get("/randomizer/state", async (_,res) => {
-  const conn = await pool.getConnection();
-  return res.send(await getInitState(conn));
+  return res.send(await getInitState());
 });
 // TODO: add jwt verification to this end point
 app.post("/lol/games", async (req, res) => {
@@ -495,7 +494,8 @@ http.listen(port, () => {
   console.log(`Randomizer-api listening at http://localhost:${port}`);
 });
 
-const randomize = async (selected, conn) => {
+const randomize = async (selected) => {
+  const conn = await pool.getConnection();
   const len = selected.length;
 
   if (len < 4 || len % 2 !== 0 || len > 10) {
@@ -548,7 +548,8 @@ const randomize = async (selected, conn) => {
   return { red: rTeam, blue: bTeam };
 };
 
-const getInitState = async (conn) => {
+const getInitState = async () => {
+  const conn = await pool.getConnection();
   let randomizerState;
   try {
     [randomizerState] = await getRandomizerState(conn);
@@ -564,7 +565,8 @@ const getInitState = async (conn) => {
   return { selected, blue, red };
 };
 
-const updateRed = async (inputRed, conn) => {
+const updateRed = async (inputRed) => {
+  const conn = await pool.getConnection();
   let randomizerState;
   try {
     const rTeamCleaned = JSON.stringify(inputRed).replace(/'/g, "\\'");
@@ -581,7 +583,8 @@ const updateRed = async (inputRed, conn) => {
   }
 };
 
-const updateBlue = async (inputBlue, conn) => {
+const updateBlue = async (inputBlue) => {
+  const conn = await pool.getConnection();
   let randomizerState;
   try {
     const blueTeamCleaned = JSON.stringify(inputBlue).replace(/'/g, "\\'");
@@ -598,7 +601,8 @@ const updateBlue = async (inputBlue, conn) => {
   }
 };
 
-const updateSelected = async (inputSelected, conn) => {
+const updateSelected = async (inputSelected) => {
+  const conn = await pool.getConnection();
   let randomizerState;
   try {
     const selectedCleaned = JSON.stringify(inputSelected).replace(/'/g, "\\'");
@@ -617,7 +621,8 @@ const updateSelected = async (inputSelected, conn) => {
   }
 };
 
-const getPlayerIdFromUserId = async (userId, conn) => {
+const getPlayerIdFromUserId = async (userId) => {
+  const conn = await pool.getConnection();
   try {
     const [playerId] = await conn.query(
       `select players.id from users left join players on users.id = players.user_id where users.login_id = '${userId}'`
@@ -636,8 +641,6 @@ const getPlayerIdFromUserId = async (userId, conn) => {
 const onlinePlayers = new Map();
 
 io.on("connection", async (socket) => {
-  const conn = await pool.getConnection();
-
   socket.on("disconnect", async () => {
     const playerId = await onlinePlayers.get(socket.id);
     console.log('disconnecting', playerId)
@@ -651,26 +654,26 @@ io.on("connection", async (socket) => {
   socket.emit("playerOnline",  Array.from(onlinePlayers.values()));
 
   socket.on("randomize", async (selected) => {
-    io.emit("randomized", await randomize(selected, conn));
+    io.emit("randomized", await randomize(selected));
   });
 
   socket.on("redUpdate", async (red) => {
-    socket.broadcast.emit("redUpdated", await updateRed(red, conn));
+    socket.broadcast.emit("redUpdated", await updateRed(red));
   });
 
   socket.on("blueUpdate", async (blue) => {
-    socket.broadcast.emit("blueUpdated", await updateBlue(blue, conn));
+    socket.broadcast.emit("blueUpdated", await updateBlue(blue));
   });
 
   socket.on("selectedUpdate", async (selected) => {
     socket.broadcast.emit(
       "selectedUpdated",
-      await updateSelected(selected, conn)
+      await updateSelected(selected)
     );
   });
 
   socket.on("online", async (userId) => {
-    const playerId = await getPlayerIdFromUserId(userId, conn)
+    const playerId = await getPlayerIdFromUserId(userId)
     await onlinePlayers.set(socket.id, playerId);
     io.emit(
       "playerOnline",
