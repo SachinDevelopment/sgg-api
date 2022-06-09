@@ -407,6 +407,10 @@ app.get("/games", async (req, res) => {
   }
 });
 
+app.get("/randomizer/state", async (_,res) => {
+  const conn = await pool.getConnection();
+  return res.send(await getInitState(conn));
+});
 // TODO: add jwt verification to this end point
 app.post("/lol/games", async (req, res) => {
   const {
@@ -644,7 +648,6 @@ io.on("connection", async (socket) => {
     );
   });
 
-  socket.emit("init", await getInitState(conn));
   socket.emit("playerOnline",  Array.from(onlinePlayers.values()));
 
   socket.on("randomize", async (selected) => {
@@ -667,7 +670,6 @@ io.on("connection", async (socket) => {
   });
 
   socket.on("online", async (userId) => {
-    console.log("recieved online broadcast", userId);
     const playerId = await getPlayerIdFromUserId(userId, conn)
     await onlinePlayers.set(socket.id, playerId);
     io.emit(
