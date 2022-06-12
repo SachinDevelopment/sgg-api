@@ -714,7 +714,9 @@ io.on("connection", async (socket) => {
   socket.emit("playerOnline",  Array.from(onlinePlayers.values()));
 
   socket.on("randomize", async (selected) => {
-    io.emit("randomized", await randomize(selected));
+    const random = await randomize(selected)
+    console.log('random', random)
+    io.emit("randomized", random);
   });
 
   socket.on("redUpdate", async (red) => {
