@@ -494,11 +494,11 @@ app.post("/lol/games/dodge", async (req, res) => {
     conn = await pool.getConnection();
     let query = `UPDATE players SET dodges=dodges+1, rating=rating-${game_size * 5}  WHERE id = (${loserId});`;
     console.log("player dodge query", query)
-    await conn.query(query);
+    // await conn.query(query);
 
     query = `INSERT INTO games (game_size, losers, blue, red, date, map, winner_rating, loser_rating, dodged) VALUES (${game_size}, "${losers}", "${blue}", "${red}", "${date}", "${map}", 0, ${game_size * 5}, 1);`;
     console.log("game dodge query", query)
-    await conn.query(query);
+    // await conn.query(query);
     res.sendStatus(200);
   } catch (err) {
     throw err;
