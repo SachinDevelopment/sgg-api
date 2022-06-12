@@ -269,14 +269,14 @@ app.get("/player/:id/map/:map/games", async (req, res) => {
     var query = `select name from players where id = ${id};`;
     var [nameResult] = await conn.query(query);
     var { name } = nameResult;
-    var query = `select * from games where (red rlike "${id}-[^,]+-[^,]+-${name}-${id}" or blue rlike "${id}-[^,]+-[^,]+-${name}-${id}") and date > "${seasonStartDate}" and  map="${mapF}" order by id desc limit ${
+    var query = `select * from games where (winners rlike "${name}-${id}" or losers rlike "${name}-${id}") and date > "${seasonStartDate}" and  map="${mapF}" order by id desc limit ${
       limit || 1000
     } offset ${page * limit - limit || 0};`;
+
     var rows = await conn.query(query);
 
-    var query = `select count(*) as count from games where (red rlike "${id}-[^,]+-[^,]+-${name}-${id}" or blue rlike "${id}-[^,]+-[^,]+-${name}-${id}") and date > "${seasonStartDate}" and map="${mapF}";`;
+    var query = `select count(*) as count from games where (winners rlike "${name}-${id}" or losers rlike "${name}-${id}") and date > "${seasonStartDate}" and map="${mapF}";`;
     var total = await conn.query(query);
-
     rows = rows.map((row) => {
       const redPlayers = row.red.split(",");
       const bluePlayers = row.blue.split(",");
@@ -289,28 +289,37 @@ app.get("/player/:id/map/:map/games", async (req, res) => {
           return player === name;
         });
       }
-
-      if (row.winning_side === "red") {
+     else if (row.winning_side === "red") {
         winner = redPlayers.some((element) => {
           const [, , , player] = element.split("-");
           return player === name;
         });
-      }
+      } 
+
       const ratingChange = winner ? row.winner_rating : row.loser_rating;
-      const redTeam = redPlayers.map((player) => {
+      let redTeam = redPlayers.map((player) => {
         const [id, role, champ, playerName] = player.split("-");
         return { id, role, player: playerName, champ };
       });
-
-      const blueTeam = bluePlayers.map((player) => {
+      if(redTeam[0]?.id === 'NULL'){
+        redTeam = [];
+      }
+      let blueTeam = bluePlayers.map((player) => {
         const [id, role, champ, playerName] = player.split("-");
         return { id, role, player: playerName, champ };
       });
-
-      const { champ: myChamp } = [...redTeam, ...blueTeam].find(
+      if(blueTeam[0]?.id === 'NULL'){
+        blueTeam = [];
+      }
+      const me = [...redTeam, ...blueTeam]?.find(
         (e) => e.player === name
       );
 
+      let myChamp;
+      if(me) {
+        myChamp = me.champ;
+      }
+    
       return {
         id: row.id,
         map: row.map,
@@ -391,12 +400,12 @@ app.get("/games", async (req, res) => {
   let conn;
   try {
     conn = await pool.getConnection();
-    var query = `select * from games where red is not null and date > "2021-03-06" order by id desc limit ${
+    var query = `select * from games where date > ${seasonStartDate} order by id desc limit ${
       limit || 1000
     } offset ${page * limit - limit || 0};`;
     var games = await conn.query(query);
 
-    var query = `select count(*) as count from games where red is not null and date > "2021-03-06"`;
+    var query = `select count(*) as count from games where red is not null and date > ${seasonStartDate}`;
     var total = await conn.query(query);
 
     res.send({ total: total[0].count, games });
@@ -470,6 +479,34 @@ app.post("/lol/games", async (req, res) => {
   }
 });
 
+app.post("/lol/games/dodge", async (req, res) => {
+  const {
+    map,
+    game_size,
+    losers,
+    loserId,
+    blue,
+    red,
+    date,
+  } = req.body;
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    let query = `UPDATE players SET dodges=dodges+1, rating=rating-${game_size * 5}  WHERE id = (${loserId});`;
+    console.log("player dodge query", query)
+    await conn.query(query);
+
+    query = `INSERT INTO games (game_size, losers, blue, red, date, map, winner_rating, loser_rating, dodged) VALUES (${game_size}, "${losers}", "${blue}", "${red}", "${date}", "${map}", 0, ${game_size * 5}, 1);`;
+    console.log("game dodge query", query)
+    await conn.query(query);
+    res.sendStatus(200);
+  } catch (err) {
+    throw err;
+  } finally {
+    if (conn) return conn.release();
+  }
+});
+
 app.post("/user", async (req, res) => {
   const { login_id, email, name } = req.body;
   let conn;
@@ -484,6 +521,29 @@ app.post("/user", async (req, res) => {
   } finally {
     if (conn) return conn.release();
   }
+});
+
+app.get("/user/:loginId", async (req, res) => {
+  console.log('test');
+const { loginId } = req.params
+ 
+const conn = await pool.getConnection();
+try {
+  const [player] = await conn.query(
+    `select players.*, login_id, email from players
+    left join users on players.user_id = users.id
+    where users.login_id = '${loginId}'`
+  );
+  if(!player) {
+    res.sendStatus(404)
+  }
+
+  res.send(player);
+} catch (err) {
+  throw err;
+} finally {
+  if (conn) conn.release();
+}
 });
 
 app.get("/health", (_, res) => {
