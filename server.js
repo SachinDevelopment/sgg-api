@@ -496,7 +496,7 @@ app.post("/lol/games/dodge", async (req, res) => {
     console.log("player dodge query", query)
     await conn.query(query);
 
-    query = `INSERT INTO games (game_size, losers, blue, red, date, map, winner_rating, loser_rating, dodged) VALUES (${game_size}, "${losers}", "${blue}", "${red}", "${date}", "${map}", 0, ${game_size * 5}, 1);`;
+    query = `INSERT INTO games (game_size, losers, blue, red, date, map, winner_rating, loser_rating, dodged) VALUES (${game_size}, "${losers}", "${blue}", "${red}", "${date}", "${map}", 0, -${game_size * 5}, 1);`;
     console.log("game dodge query", query)
     await conn.query(query);
     res.sendStatus(200);
