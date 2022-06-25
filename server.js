@@ -695,9 +695,8 @@ const getPlayerIdFromUserId = async (userId) => {
   }
 };
 
-
-
 io.on("connection", async (socket) => {
+  console.log('getting here?');
   socket.on("randomize", async (selected) => {
     const random = await randomize(selected)
     io.emit("randomized", random);
