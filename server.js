@@ -126,26 +126,39 @@ app.get("/player/:id/stats", async (req, res) => {
 
     var playerquery = `select * from players where id = ${id};`;
     var [player] = await conn.query(playerquery);
-
     query = `select count(*) as count from games where (red rlike "${id}-Jungle-[^,]+-${name}-${id}" or blue rlike "${id}-Jungle-[^,]+-${name}-${id}") and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
     var [srJungle] = await conn.query(query);
 
-    query = `select count(*) as count from games where (red rlike "${id}-Lane-[^,]+-${name}-${id}" or blue rlike "${id}-Lane-[^,]+-${name}-${id}") and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
-    var [srLane] = await conn.query(query);
+    query = `select count(*) as count from games where (red rlike "${id}-Top-[^,]+-${name}-${id}" or blue rlike "${id}-Top-[^,]+-${name}-${id}") and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
+    var [srTop] = await conn.query(query);
 
-    query = `select count(*) as count from games where (red rlike "${id}-Fill-[^,]+-${name}-${id}" or blue rlike "${id}-Fill-[^,]+-${name}-${id}") and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
-    var [srFill] = await conn.query(query);
-
-    query = `select count(*) as count from games where ((red rlike "${id}-Lane-[^,]+-${name}-${id}" and winning_side="red") or (blue rlike "${id}-Lane-[^,]+-${name}-${id}" and winning_side="blue")) and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
-    var [laneWins] = await conn.query(query);
-    const laneWR = srLane.count
-      ? Number((laneWins.count / srLane.count) * 100).toFixed(0)
-      : 0;
-
+    query = `select count(*) as count from games where (red rlike "${id}-Mid-[^,]+-${name}-${id}" or blue rlike "${id}-Mid-[^,]+-${name}-${id}") and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
+    var [srMid] = await conn.query(query);
+    query = `select count(*) as count from games where (red rlike "${id}-Bot-[^,]+-${name}-${id}" or blue rlike "${id}-Bot-[^,]+-${name}-${id}") and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
+    var [srBot] = await conn.query(query);
     query = `select count(*) as count from games where ((red rlike "${id}-Jungle-[^,]+-${name}-${id}" and winning_side="red") or (blue rlike "${id}-Jungle-[^,]+-${name}-${id}" and winning_side="blue")) and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
     var [jungleWins] = await conn.query(query);
     const jungleWR = srJungle.count
       ? Number((jungleWins.count / srJungle.count) * 100).toFixed(0)
+      : 0;
+
+    query = `select count(*) as count from games where ((red rlike "${id}-Top-[^,]+-${name}-${id}" and winning_side="red") or (blue rlike "${id}-Top-[^,]+-${name}-${id}" and winning_side="blue")) and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
+    var [topWins] = await conn.query(query);
+    const topWR = srTop.count
+      ? Number((topWins.count / srTop.count) * 100).toFixed(0)
+      : 0;
+
+    query = `select count(*) as count from games where ((red rlike "${id}-Mid-[^,]+-${name}-${id}" and winning_side="red") or (blue rlike "${id}-Mid-[^,]+-${name}-${id}" and winning_side="blue")) and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
+    var [midWins] = await conn.query(query);
+    const midWR = srMid.count
+      ? Number((midWins.count / srMid.count) * 100).toFixed(0)
+      : 0;
+
+    query = `select count(*) as count from games where ((red rlike "${id}-Bot-[^,]+-${name}-${id}" and winning_side="red") or (blue rlike "${id}-Bot-[^,]+-${name}-${id}" and winning_side="blue")) and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
+    var [botWins] = await conn.query(query);
+
+    const botWR = srBot.count
+      ? Number((botWins.count / srBot.count) * 100).toFixed(0)
       : 0;
 
     let srChampsQuery = `select blue,red from games where (red rlike "${id}-[^,]+-[^,]+-${name}-${id}" or blue rlike "${id}-[^,]+-[^,]+-${name}-${id}") and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
@@ -193,11 +206,14 @@ app.get("/player/:id/stats", async (req, res) => {
     res.send({
       ...player,
       ...lastSeasonRating,
-      lane: srLane.count,
-      laneWR,
+      Top: srTop.count,
+      topWR,
       jungle: srJungle.count,
       jungleWR,
-      fill: srFill.count,
+      Mid: srMid.count,
+      midWR,
+      Bot: srBot.count,
+      botWR,
       champs: srChampWrArr,
       prevRatings,
     });
@@ -288,38 +304,35 @@ app.get("/player/:id/map/:map/games", async (req, res) => {
           const [, , , player] = element.split("-");
           return player === name;
         });
-      }
-     else if (row.winning_side === "red") {
+      } else if (row.winning_side === "red") {
         winner = redPlayers.some((element) => {
           const [, , , player] = element.split("-");
           return player === name;
         });
-      } 
+      }
 
       const ratingChange = winner ? row.winner_rating : row.loser_rating;
       let redTeam = redPlayers.map((player) => {
         const [id, role, champ, playerName] = player.split("-");
         return { id, role, player: playerName, champ };
       });
-      if(redTeam[0]?.id === 'NULL'){
+      if (redTeam[0]?.id === "NULL") {
         redTeam = [];
       }
       let blueTeam = bluePlayers.map((player) => {
         const [id, role, champ, playerName] = player.split("-");
         return { id, role, player: playerName, champ };
       });
-      if(blueTeam[0]?.id === 'NULL'){
+      if (blueTeam[0]?.id === "NULL") {
         blueTeam = [];
       }
-      const me = [...redTeam, ...blueTeam]?.find(
-        (e) => e.player === name
-      );
+      const me = [...redTeam, ...blueTeam]?.find((e) => e.player === name);
 
       let myChamp;
-      if(me) {
+      if (me) {
         myChamp = me.champ;
       }
-    
+
       return {
         id: row.id,
         map: row.map,
@@ -416,7 +429,7 @@ app.get("/games", async (req, res) => {
   }
 });
 
-app.get("/randomizer/state", async (_,res) => {
+app.get("/randomizer/state", async (_, res) => {
   return res.send(await getInitState());
 });
 // TODO: add jwt verification to this end point
@@ -480,24 +493,20 @@ app.post("/lol/games", async (req, res) => {
 });
 
 app.post("/lol/games/dodge", async (req, res) => {
-  const {
-    map,
-    game_size,
-    losers,
-    loserId,
-    blue,
-    red,
-    date,
-  } = req.body;
+  const { map, game_size, losers, loserId, blue, red, date } = req.body;
   let conn;
   try {
     conn = await pool.getConnection();
-    let query = `UPDATE players SET dodges=dodges+1, rating=rating-${game_size * 5}  WHERE id = (${loserId});`;
-    console.log("player dodge query", query)
+    let query = `UPDATE players SET dodges=dodges+1, rating=rating-${
+      game_size * 5
+    }  WHERE id = (${loserId});`;
+    console.log("player dodge query", query);
     await conn.query(query);
 
-    query = `INSERT INTO games (game_size, losers, blue, red, date, map, winner_rating, loser_rating, dodged) VALUES (${game_size}, "${losers}", "${blue}", "${red}", "${date}", "${map}", 0, -${game_size * 5}, 1);`;
-    console.log("game dodge query", query)
+    query = `INSERT INTO games (game_size, losers, blue, red, date, map, winner_rating, loser_rating, dodged) VALUES (${game_size}, "${losers}", "${blue}", "${red}", "${date}", "${map}", 0, -${
+      game_size * 5
+    }, 1);`;
+    console.log("game dodge query", query);
     await conn.query(query);
     res.sendStatus(200);
   } catch (err) {
@@ -524,25 +533,25 @@ app.post("/user", async (req, res) => {
 });
 
 app.get("/user/:loginId", async (req, res) => {
-const { loginId } = req.params
- 
-const conn = await pool.getConnection();
-try {
-  const [player] = await conn.query(
-    `select players.*, login_id, email from players
+  const { loginId } = req.params;
+
+  const conn = await pool.getConnection();
+  try {
+    const [player] = await conn.query(
+      `select players.*, login_id, email from players
     left join users on players.user_id = users.id
     where users.login_id = '${loginId}'`
-  );
-  if(!player) {
-    res.sendStatus(404)
-  }
+    );
+    if (!player) {
+      res.sendStatus(404);
+    }
 
-  res.send(player);
-} catch (err) {
-  throw err;
-} finally {
-  if (conn) conn.release();
-}
+    res.send(player);
+  } catch (err) {
+    throw err;
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 app.get("/health", (_, res) => {
@@ -696,9 +705,8 @@ const getPlayerIdFromUserId = async (userId) => {
 };
 
 io.on("connection", async (socket) => {
-  console.log('getting here?');
   socket.on("randomize", async (selected) => {
-    const random = await randomize(selected)
+    const random = await randomize(selected);
     io.emit("randomized", random);
   });
 
@@ -711,10 +719,6 @@ io.on("connection", async (socket) => {
   });
 
   socket.on("selectedUpdate", async (selected) => {
-    socket.emit(
-      "selectedUpdated",
-      await updateSelected(selected)
-    );
+    socket.emit("selectedUpdated", await updateSelected(selected));
   });
-
 });
