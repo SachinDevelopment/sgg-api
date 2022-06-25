@@ -135,8 +135,13 @@ app.get("/player/:id/stats", async (req, res) => {
     query = `select count(*) as count from games where (red rlike "${id}-Mid-[^,]+-${name}-${id}" or blue rlike "${id}-Mid-[^,]+-${name}-${id}") and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
     var [srMid] = await conn.query(query);
     query = `select count(*) as count from games where (red rlike "${id}-Bot-[^,]+-${name}-${id}" or blue rlike "${id}-Bot-[^,]+-${name}-${id}") and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
+    
     var [srBot] = await conn.query(query);
     query = `select count(*) as count from games where ((red rlike "${id}-Jungle-[^,]+-${name}-${id}" and winning_side="red") or (blue rlike "${id}-Jungle-[^,]+-${name}-${id}" and winning_side="blue")) and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
+
+    var [srSupport] = await conn.query(query);
+    query = `select count(*) as count from games where ((red rlike "${id}-Support-[^,]+-${name}-${id}" and winning_side="red") or (blue rlike "${id}-Support-[^,]+-${name}-${id}" and winning_side="blue")) and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
+    
     var [jungleWins] = await conn.query(query);
     const jungleWR = srJungle.count
       ? Number((jungleWins.count / srJungle.count) * 100).toFixed(0)
@@ -156,10 +161,15 @@ app.get("/player/:id/stats", async (req, res) => {
 
     query = `select count(*) as count from games where ((red rlike "${id}-Bot-[^,]+-${name}-${id}" and winning_side="red") or (blue rlike "${id}-Bot-[^,]+-${name}-${id}" and winning_side="blue")) and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
     var [botWins] = await conn.query(query);
-
     const botWR = srBot.count
       ? Number((botWins.count / srBot.count) * 100).toFixed(0)
       : 0;
+
+      query = `select count(*) as count from games where ((red rlike "${id}-Support-[^,]+-${name}-${id}" and winning_side="red") or (blue rlike "${id}-Support-[^,]+-${name}-${id}" and winning_side="blue")) and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
+      var [supportWins] = await conn.query(query);
+      const supportWR = srSupport.count
+        ? Number((supportWins.count / srSupport.count) * 100).toFixed(0)
+        : 0;
 
     let srChampsQuery = `select blue,red from games where (red rlike "${id}-[^,]+-[^,]+-${name}-${id}" or blue rlike "${id}-[^,]+-[^,]+-${name}-${id}") and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
     var srChamps = await conn.query(srChampsQuery);
@@ -206,14 +216,16 @@ app.get("/player/:id/stats", async (req, res) => {
     res.send({
       ...player,
       ...lastSeasonRating,
-      Top: srTop.count,
+      top: srTop.count,
       topWR,
       jungle: srJungle.count,
       jungleWR,
-      Mid: srMid.count,
+      mid: srMid.count,
       midWR,
-      Bot: srBot.count,
+      bot: srBot.count,
       botWR,
+      Support: srSupport.count,
+      supportWR,
       champs: srChampWrArr,
       prevRatings,
     });
