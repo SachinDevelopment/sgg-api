@@ -126,6 +126,7 @@ app.get("/player/:id/stats", async (req, res) => {
 
     var playerquery = `select * from players where id = ${id};`;
     var [player] = await conn.query(playerquery);
+
     query = `select count(*) as count from games where (red rlike "${id}-Jungle-[^,]+-${name}-${id}" or blue rlike "${id}-Jungle-[^,]+-${name}-${id}") and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
     var [srJungle] = await conn.query(query);
 
@@ -134,14 +135,14 @@ app.get("/player/:id/stats", async (req, res) => {
 
     query = `select count(*) as count from games where (red rlike "${id}-Mid-[^,]+-${name}-${id}" or blue rlike "${id}-Mid-[^,]+-${name}-${id}") and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
     var [srMid] = await conn.query(query);
+    
     query = `select count(*) as count from games where (red rlike "${id}-Bot-[^,]+-${name}-${id}" or blue rlike "${id}-Bot-[^,]+-${name}-${id}") and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
-    
     var [srBot] = await conn.query(query);
-    query = `select count(*) as count from games where ((red rlike "${id}-Jungle-[^,]+-${name}-${id}" and winning_side="red") or (blue rlike "${id}-Jungle-[^,]+-${name}-${id}" and winning_side="blue")) and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
-
-    var [srSupport] = await conn.query(query);
-    query = `select count(*) as count from games where ((red rlike "${id}-Support-[^,]+-${name}-${id}" and winning_side="red") or (blue rlike "${id}-Support-[^,]+-${name}-${id}" and winning_side="blue")) and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
     
+    query = `select count(*) as count from games where ((red rlike "${id}-Support-[^,]+-${name}-${id}" and winning_side="red") or (blue rlike "${id}-Support-[^,]+-${name}-${id}" and winning_side="blue")) and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
+    var [srSupport] = await conn.query(query);
+    
+    query = `select count(*) as count from games where ((red rlike "${id}-Jungle-[^,]+-${name}-${id}" and winning_side="red") or (blue rlike "${id}-Jungle-[^,]+-${name}-${id}" and winning_side="blue")) and map="Summoner's Rift" and date > "${seasonStartDate}" and dodged=false;`;
     var [jungleWins] = await conn.query(query);
     const jungleWR = srJungle.count
       ? Number((jungleWins.count / srJungle.count) * 100).toFixed(0)
