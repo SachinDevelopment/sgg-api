@@ -610,6 +610,7 @@ const randomize = async () => {
     selected.some((s) => s.id === p.id)
   );
   playerClone.forEach((player) => (player.champion = "Champion"));
+  playerClone.forEach((player) => (player.ready = false));
   const rTeam = [];
   const bTeam = [];
 
