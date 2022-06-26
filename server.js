@@ -575,8 +575,17 @@ http.listen(port, () => {
   console.log(`Randomizer-api listening at http://localhost:${port}`);
 });
 
-const randomize = async (selected) => {
+const randomize = async () => {
   const conn = await pool.getConnection();
+  let randomizerState;
+  try {
+    [randomizerState] = await getRandomizerState(conn);
+  } catch (err) {
+    throw err;
+  }
+
+  let { selected = []} = randomizerState;
+  selected = JSON.parse(selected.replace(/\\/g, ""));
   const len = selected.length;
 
   if (len < 4 || len % 2 !== 0 || len > 10) {
@@ -588,20 +597,11 @@ const randomize = async (selected) => {
   } catch (err) {
     throw err;
   }
+
   const playerClone = availablePlayers.filter((p) =>
     selected.some((s) => s.id === p.id)
   );
   playerClone.forEach((player) => (player.champion = "Champion"));
-  playerClone.sort((a, b) => {
-    const bGames = b.wins + b.loses;
-    const aGames = a.wins + a.loses;
-    const val =
-      !!(bGames >= 10) - !!(aGames >= 10) ||
-      !!(bGames > 0) - !!(aGames > 0) ||
-      b.rating - a.rating ||
-      b.wins - a.wins;
-    return val;
-  });
   const rTeam = [];
   const bTeam = [];
 
@@ -722,9 +722,9 @@ io.on("connection", async (socket) => {
   socket.on("disconnect", (reason) => {
     console.log(reason); // "ping timeout"
   });
-  
-  socket.on("randomize", async (selected) => {
-    const random = await randomize(selected);
+
+  socket.on("randomize", async () => {
+    const random = await randomize();
     io.emit("randomized", random);
   });
 
