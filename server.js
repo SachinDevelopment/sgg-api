@@ -728,6 +728,10 @@ io.on("connection", async (socket) => {
     io.emit("randomized", random);
   });
 
+  socket.on("dodged", async (name) => {
+    io.emit("playerDodged", name);
+  });
+
   socket.on("redUpdate", async (red) => {
     socket.broadcast.emit("redUpdated", await updateRed(red));
   });
