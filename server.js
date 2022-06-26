@@ -506,7 +506,7 @@ app.post("/lol/games", async (req, res) => {
 });
 
 app.post("/lol/games/dodge", async (req, res) => {
-  const { map, game_size, losers, loserId, blue, red, date } = req.body;
+  const { map, game_size, losers, loserId, blue, red, date, loserName } = req.body;
   let conn;
   try {
     conn = await pool.getConnection();
@@ -521,6 +521,14 @@ app.post("/lol/games/dodge", async (req, res) => {
     }, 1);`;
     console.log("game dodge query", query);
     await conn.query(query);
+
+    query = `update randomizer_state set dodged = true, dodgerName = '${loserName}';`;
+    console.log('query', query);
+    await conn.query(query);
+
+    console.log("game dodge query", query);
+    await conn.query(query);
+
     res.sendStatus(200);
   } catch (err) {
     throw err;
@@ -617,7 +625,7 @@ const randomize = async () => {
   try {
     const rTeamCleaned = JSON.stringify(rTeam).replace(/'/g, "\\'");
     const bTeamCleaned = JSON.stringify(bTeam).replace(/'/g, "\\'");
-    await conn.query("update randomizer_state set red = ?, blue = ?", [
+    await conn.query("update randomizer_state set red = ?, blue = ?, dodged = 0, dodgerName = NULL", [
       rTeamCleaned,
       bTeamCleaned,
     ]);
@@ -639,11 +647,11 @@ const getInitState = async () => {
   } finally {
     if (conn) conn.release();
   }
-  let { selected, blue, red } = randomizerState;
+  let { selected, blue, red, dodged, dodgerName } = randomizerState;
   red = JSON.parse(red.replace(/\\/g, ""));
   blue = JSON.parse(blue.replace(/\\/g, ""));
   selected = JSON.parse(selected.replace(/\\/g, ""));
-  return { selected, blue, red };
+  return { selected, blue, red, dodged, dodgerName };
 };
 
 const updateRed = async (inputRed) => {
